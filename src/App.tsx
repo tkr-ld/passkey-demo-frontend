@@ -1,29 +1,71 @@
-import { useState } from "react";
-import reactLogo from "./assets/react.svg";
-import viteLogo from "/vite.svg";
+import base64url from "base64url";
 import styles from "./App.module.scss";
 import { Button, ChakraProvider, defaultSystem } from "@chakra-ui/react";
+import {
+  AuthenticatorTransportFuture,
+  PublicKeyCredentialType,
+  RegistrationResponseJSON,
+} from "@simplewebauthn/server";
+import axios from "axios";
+
+const API_BASE_URL = "https://localhost:5174";
 
 function App() {
   const onClick = async () => {
-    console.log("onClick");
-    const credentials = await navigator.credentials.create({
-      publicKey: {
-        challenge: new Uint8Array(32),
-        rp: { id: "localhost", name: "passkey example" },
-        user: { id: new Uint8Array(32), name: "user", displayName: "User" },
-        pubKeyCredParams: [
-          { type: "public-key", alg: -8 },
-          { type: "public-key", alg: -7 },
-          { type: "public-key", alg: -257 },
-        ],
-        authenticatorSelection: { userVerification: "required" },
-        timeout: 60000,
-        attestation: "direct",
-      },
-    });
-    console.log(credentials)
+    try {
+      const credentials = await createPasskeyCredential();
+      const authResponse =
+        credentials.response as AuthenticatorAttestationResponse;
+      const serverRequest: RegistrationResponseJSON = {
+        id: credentials.id,
+        rawId: credentials.id,
+        type: credentials.type as PublicKeyCredentialType,
+        clientExtensionResults: credentials.getClientExtensionResults(),
+        response: {
+          clientDataJSON: base64url.encode(authResponse.clientDataJSON),
+          attestationObject: base64url(authResponse.attestationObject),
+          transports:
+            authResponse.getTransports() as AuthenticatorTransportFuture[],
+        },
+      };
+
+      await axios({
+        url: API_BASE_URL,
+        headers: {
+          "Content-Type": "application/json",
+        },
+        method: "post",
+        data: serverRequest,
+      });
+    } catch (e) {
+      console.error(e);
+    }
     // TODO send credentials to server
+  };
+
+  const createPasskeyCredential = async (): Promise<PublicKeyCredential> => {
+    try {
+      const credentials = (await navigator.credentials.create({
+        publicKey: {
+          challenge: new Uint8Array(32),
+          rp: { id: "localhost", name: "passkey example" },
+          user: { id: new Uint8Array(32), name: "user", displayName: "User" },
+          pubKeyCredParams: [
+            { type: "public-key", alg: -8 },
+            { type: "public-key", alg: -7 },
+            { type: "public-key", alg: -257 },
+          ],
+          authenticatorSelection: { userVerification: "required" },
+          timeout: 60000,
+          attestation: "direct",
+        },
+      })) as PublicKeyCredential;
+      console.log(credentials);
+      return credentials;
+    } catch (e) {
+      console.log(e);
+      throw e;
+    }
   };
 
   return (
