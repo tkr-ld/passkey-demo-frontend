@@ -16,6 +16,7 @@
     "@simplewebauthn/server": "^13.1.1",
     "axios": "^1.8.2",
     "base64url": "^3.0.1",
+    "crypto": "^1.0.1",
     "framer-motion": "^12.4.10",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
