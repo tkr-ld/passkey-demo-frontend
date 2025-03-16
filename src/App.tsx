@@ -1,8 +1,9 @@
-
 import styles from "./App.module.scss";
 import { Button, ChakraProvider, defaultSystem } from "@chakra-ui/react";
 import {
+  AuthenticationResponseJSON,
   AuthenticatorTransportFuture,
+  generateAuthenticationOptions,
   generateRegistrationOptions,
   PublicKeyCredentialType,
   RegistrationResponseJSON,
@@ -10,27 +11,29 @@ import {
 import axios from "axios";
 
 const API_BASE_URL = "http://localhost:3001";
+const rpName = "passkey-sample";
+const rpId = "localhost";
 
 function base64URLEncode(pureBase64: string): string {
-  return pureBase64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return pureBase64.replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
 }
 
 // Base64URLデコード
 function base64URLDecode(base64url: string): string {
-  base64url = base64url.replace(/-/g, '+').replace(/_/g, '/');
+  base64url = base64url.replace(/-/g, "+").replace(/_/g, "/");
   const padding = 4 - (base64url.length % 4);
   if (padding !== 4) {
-      base64url += '='.repeat(padding);
+    base64url += "=".repeat(padding);
   }
   return base64url;
 }
 
 function arrayBufferToBase64URL(buffer: ArrayBuffer): string {
-  let binary = '';
+  let binary = "";
   const bytes = new Uint8Array(buffer);
   const len = bytes.byteLength;
   for (let i = 0; i < len; i++) {
-      binary += String.fromCharCode(bytes[i]);
+    binary += String.fromCharCode(bytes[i]);
   }
   const base64 = btoa(binary);
   return base64URLEncode(base64);
@@ -43,15 +46,15 @@ function base64URLToArrayBuffer(base64url: string): ArrayBuffer {
   const len = binaryString.length;
   const bytes = new Uint8Array(len);
   for (let i = 0; i < len; i++) {
-      bytes[i] = binaryString.charCodeAt(i);
+    bytes[i] = binaryString.charCodeAt(i);
   }
   return bytes.buffer;
 }
 
 function App() {
-  const onClick = async () => {
+  const onRegister = async () => {
     try {
-      const {credentials, challenge} = await createPasskeyCredential();
+      const { credentials, challenge } = await createRegistrationCredential();
       const authResponse =
         credentials.response as AuthenticatorAttestationResponse;
 
@@ -62,7 +65,9 @@ function App() {
         clientExtensionResults: credentials.getClientExtensionResults(),
         response: {
           clientDataJSON: arrayBufferToBase64URL(authResponse.clientDataJSON),
-          attestationObject: arrayBufferToBase64URL(authResponse.attestationObject),
+          attestationObject: arrayBufferToBase64URL(
+            authResponse.attestationObject
+          ),
           transports:
             authResponse.getTransports() as AuthenticatorTransportFuture[],
         },
@@ -80,36 +85,10 @@ function App() {
     } catch (e) {
       console.error(e);
     }
-    // TODO send credentials to server
   };
 
-  function base64url2ab(base64url: string) {
-    return base642ab(base64url2base64(base64url));
-  }
-
-  function base642ab(base64: string) {
-    const str = window.atob(base64);
-    const len = str.length;
-    const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
-      bytes[i] = str.charCodeAt(i);
-    }
-    return bytes.buffer;
-  }
-
-  function base64url2base64(base64url: string) {
-    const base64 = base64url.replace(/-/g, '+').replace(/_/g, '/');
-    const padding = base64.length % 4;
-    if (padding > 0) {
-      return base64 + '===='.slice(padding);
-    } 
-    return base64;
-  }
-
-  const createPasskeyCredential = async () => {
+  const createRegistrationCredential = async () => {
     try {
-      const rpName = "passkey-sample";
-      const rpId = "localhost";
       const userId = new Uint8Array(32);
       const user = "user1";
       const authenticatorSelection: AuthenticatorSelectionCriteria = {
@@ -149,7 +128,84 @@ function App() {
       return {
         credentials,
         challenge: options.challenge,
+      };
+    } catch (e) {
+      console.log(e);
+      throw e;
+    }
+  };
+
+  // パスキーログイン処理
+  const onAuthorize = async () => {
+    try {
+      const { credentials, challenge } = await createAuthenticationCredential();
+      // const authResponse =
+      //   credentials.response as AuthenticatorAttestationResponse;
+
+      if (credentials === null) {
+        alert("認証に失敗しました");
+        return;
       }
+
+      const publicKeyCredential = credentials as PublicKeyCredential;
+      const authenticatorAssertionResponse =
+        publicKeyCredential.response as AuthenticatorAssertionResponse;
+
+      const serverRequest: AuthenticationResponseJSON = {
+        id: publicKeyCredential.id,
+        rawId: publicKeyCredential.id,
+        type: publicKeyCredential.type as PublicKeyCredentialType,
+        response: {
+          authenticatorData: arrayBufferToBase64URL(
+            authenticatorAssertionResponse.authenticatorData
+          ),
+          clientDataJSON: arrayBufferToBase64URL(
+            authenticatorAssertionResponse.clientDataJSON
+          ),
+          signature: arrayBufferToBase64URL(
+            authenticatorAssertionResponse.signature
+          ),
+          userHandle: arrayBufferToBase64URL(
+            authenticatorAssertionResponse.userHandle!
+          ),
+        },
+        clientExtensionResults: publicKeyCredential.getClientExtensionResults(),
+      };
+
+      await axios({
+        url: `${API_BASE_URL}/passkey/authenticate`,
+        headers: {
+          Challenge: challenge,
+          "Content-Type": "application/json",
+        },
+        method: "post",
+        data: serverRequest,
+      });
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  const createAuthenticationCredential = async () => {
+    try {
+      const options = await generateAuthenticationOptions({
+        rpID: rpId,
+      });
+
+      const credentials = await navigator.credentials.get({
+        publicKey: {
+          challenge: base64URLToArrayBuffer(options.challenge),
+          rpId: options.rpId,
+          userVerification: "preferred",
+          timeout: options.timeout,
+        },
+        //mediation: "conditional",
+      });
+      console.log(credentials);
+      return {
+        credentials,
+        challenge: options.challenge,
+      };
     } catch (e) {
       console.log(e);
       throw e;
@@ -158,7 +214,8 @@ function App() {
 
   return (
     <ChakraProvider value={defaultSystem}>
-      <Button onClick={onClick}>パスキー新規登録</Button>
+      <Button onClick={onRegister}>パスキー新規登録</Button>
+      <Button onClick={onAuthorize}>パスキーログイン</Button>
       {/* <div>
         <div className={styles.test}>test</div>
         <a href="https://vite.dev" target="_blank">
