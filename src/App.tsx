@@ -82,6 +82,8 @@ function App() {
         method: "post",
         data: serverRequest,
       });
+
+      alert('パスキーの登録に成功しました');
     } catch (e) {
       console.error(e);
     }
@@ -181,6 +183,8 @@ function App() {
         method: "post",
         data: serverRequest,
       });
+
+      alert("パスキー認証に成功しました");
     } catch (e) {
       console.error(e);
     }
@@ -214,8 +218,15 @@ function App() {
 
   return (
     <ChakraProvider value={defaultSystem}>
-      <Button onClick={onRegister}>パスキー新規登録</Button>
-      <Button onClick={onAuthorize}>パスキーログイン</Button>
+      <h1 className={styles.title}>パスキーデモサイト</h1>
+      <div className={styles.layout}>
+        <Button onClick={onRegister} size="xl" className={styles.button}>
+          パスキー新規登録
+        </Button>
+        <Button onClick={onAuthorize} size="xl" className={styles.button}>
+          パスキーログイン
+        </Button>
+      </div>
       {/* <div>
         <div className={styles.test}>test</div>
         <a href="https://vite.dev" target="_blank">

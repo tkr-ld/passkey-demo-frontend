@@ -4,8 +4,25 @@
   padding: 2rem;
   text-align: center;
 }
-.test {
-  color: red;
+
+.title {
+  font-size: 2rem;
+  font-weight: bold;
+  margin: 40px 40px 40px;
+}
+
+.layout {
+  padding: 0 40px 40px 40px;
+  display: flex;
+  flex-direction:column;
+  gap: 20px;
+  justify-content:center;
+}
+
+.button{
+  width: 300px;
+  display: flex;
+  justify-content:center;
 }
 
 .logo {
